@@ -6,7 +6,7 @@
  */
 function calculateSimpleRevenue(purchase, _product) {
     const discount = 1 - (purchase.discount / 100);
-    const revenue = _product.sale_price * purchase.quantity * discount; 
+    const revenue = purchase.sale_price * purchase.quantity * discount; 
     return revenue;
 };
 /**
@@ -42,16 +42,19 @@ function analyzeSalesData(data, options) {
     if( !data || !Array.isArray(data.sellers) || data.sellers.length === 0 ) {
         throw new Error('Некорректные входные данные');
     };
-    if(typeof options !== 'object' ) {
+    if(!options || typeof options !== 'object' ) {
         throw new Error('Некорректные опции'); 
     };
-    options = { calculateSimpleRevenue, calculateBonusByProfit };
-    if (typeof calculateSimpleRevenue !== 'function' ) {
+    const { calculateRevenue, calculateBonus } = options;
+    if (typeof calculateRevenue !== 'function' ) {
         throw new Error('Некорректная функция расчета выручки');
     };
-    if (typeof calculateBonusByProfit !== 'function' ) {
+    if (typeof calculateBonus !== 'function' ) {
         throw new Error('Некорректная функция расчета бонусов');
     };
+    if( !Array.isArray(data.purchase_records) || data.purchase_records.length === 0 ) {
+        throw new Error('Некорректные данные о продажах');
+    }
     const sellersStats = data.sellers.map( seller => {
         return {
             id: seller.id,
@@ -75,7 +78,7 @@ function analyzeSalesData(data, options) {
             throw new Error(`Товар с артикулом ${item.sku} не найден`);
         };
         const cost = product.purchase_price * item.quantity;
-        const revenue = calculateSimpleRevenue(item, item);
+        const revenue = calculateRevenue(item, product);
         const profit = revenue - cost;
         seller.profit += profit;
         if( !seller.products_sold[item.sku] ) {
@@ -86,7 +89,7 @@ function analyzeSalesData(data, options) {
 });
     sellersStats.sort( (a, b) => b.profit - a.profit );
     sellersStats.forEach( (seller, index) => {
-        seller.bonus = calculateBonusByProfit(index, sellersStats.length, seller);
+        seller.bonus = calculateBonus(index, sellersStats.length, seller);
         seller.top_products = Object.entries(seller.products_sold)
         .map(([sku, quantity]) => ({ sku, quantity }))
         .sort((a, b) => b.quantity - a.quantity)
